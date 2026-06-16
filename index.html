@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script>
+  // Global state
+  let fullData = {};
+
+  // Load Google Charts
+  google.charts.load('current', {'packages':['corechart', 'orgchart']});
+  google.charts.setOnLoadCallback(fetchData);
+
+  function fetchData() {
+    document.getElementById('kpi-container').innerHTML = 'Loading dashboard data...';
+    google.script.run
+
+.withSuccessHandler(function(data){
+
+console.log(
+"Dashboard data received:",
+data
+);
+
+if(!data){
+
+alert(
+"Backend returned NULL"
+);
+
+return;
+
+}
+
+if(data.error){
+
+alert(
+data.error
+);
+
+return;
+
+}
+
+initDashboard(
+data
+);
+
+})
+
+.withFailureHandler(function(err){
+
+console.log(
+err
+);
+
+alert(
+"Backend Failure: " +
+err
+);
+
+})
+
+.getWebAppDashboardData();
+  }
+
+function initDashboard(data) {
+
+console.log(
+"Dashboard data received:",
+data
+);
+
+if(!data){
+
+document.body.innerHTML += `
+<div style="
+padding:20px;
+color:red;
+font-size:18px;
+">
+Backend returned NULL
+</div>
+`;
+
+return;
+
+}
+
+if(data.error){
+
+document.body.innerHTML += `
+<div style="
+padding:20px;
+color:red;
+font-size:18px;
+">
+Backend Error:
+${data.error}
+</div>
+`;
+
+return;
+
+}
+
+try {
+
+fullData = data;
+
+renderKpis(
+data.kpis || {}
+);
+
+renderAlerts(
+data.alerts || {},
+data.config || {}
+);
+
+renderDeptPieChart(
+data.departmentBreakdown || {}
+);
+
+renderAttritionChart(
+data.quarterlyAttrition || {}
+);
+
+/* ADD THIS */
+
+renderOrgChart(
+data.orgChartData || []
+);
+
+renderDrillDown(
+data.allEmployees || []
+);
+
+}
+
+catch(err){
+
+console.error(err);
+
+}
+
+}
+function renderKpis(kpis) {
+
+const container =
+document.getElementById(
+'kpi-container'
+);
+
+container.innerHTML='';
+
+
+const cards = [
+
+['Total Headcount',kpis.totalHeadcount],
+
+['India Headcount',kpis.indiaHeadcount],
+
+['US Headcount',kpis.usHeadcount],
+
+['Confirmed',kpis.confirmed],
+
+['Under Probation',kpis.probation],
+
+['Interns',kpis.interns],
+
+['Active Risks',kpis.activeRisks]
+
+];
+
+
+cards.forEach(card=>{
+
+container.innerHTML += `
+
+<div class="kpi-card">
+
+<div class="title">
+
+${card[0]}
+
+</div>
+
+<div class="value">
+
+${card[1] || 0}
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+function renderAlerts(alerts, config) {
+    const lwdContainer = document.getElementById('lwd-alerts');
+    lwdContainer.innerHTML = `<h3>LWD Alerts (within ${config.LWD_DAYS} days)</h3>`;
+    if ((alerts.lwd || []).length > 0) {
+      alerts.lwd.forEach(a => {
+        lwdContainer.innerHTML += `<div class="alert-item">${a['Employee Name']} - LWD: ${new Date(a['Last Working Day (Interns Only)']).toLocaleDateString()}</div>`;
+      });
+    } else {
+      lwdContainer.innerHTML += '<p>No upcoming LWDs.</p>';
+    }
+
+    const probContainer = document.getElementById('probation-alerts');
+    probContainer.innerHTML = `<h3>Probation Alerts (confirmation within ${config.PROBATION_NOTICE_DAYS} days)</h3>`;
+    if ((alerts.probation || []).length > 0) {
+      alerts.probation.forEach(a => {
+        probContainer.innerHTML += `<div class="alert-item">${a['Employee Name']} - Confirmation: ${new Date(a.confirmationDate).toLocaleDateString()}</div>`;
+      });
+    } else {
+      probContainer.innerHTML += '<p>No employees nearing confirmation.</p>';
+    }
+  }
+
+  function renderDeptPieChart(breakdown) {
+    const dataArray = [['Department', 'Headcount'], ...Object.entries(breakdown)];
+    const data = google.visualization.arrayToDataTable(dataArray);
+    const options = { title: 'Department Headcount Distribution', pieHole: 0.4 };
+    const chart = new google.visualization.PieChart(document.getElementById('dept-pie-chart'));
+    chart.draw(data, options);
+  }
+
+  function renderAttritionChart(attrition) {
+    const sortedQuarters = Object.entries(attrition).sort((a, b) => a[0].localeCompare(b[0]));
+    const dataArray = [['Quarter', 'Leavers'], ...sortedQuarters];
+    const data = google.visualization.arrayToDataTable(dataArray);
+    const options = { title: 'Quarterly Attrition Trend', curveType: 'function', legend: { position: 'bottom' } };
+    const chart = new google.visualization.LineChart(document.getElementById('attrition-line-chart'));
+    chart.draw(data, options);
+  }
+
+  function renderOrgChart(orgData){
+
+const container =
+document.getElementById(
+'org-chart'
+);
+
+container.innerHTML='';
+
+if(!orgData || !orgData.length){
+
+container.innerHTML=
+'No organization data';
+
+return;
+
+}
+
+const data =
+new google.visualization.DataTable();
+
+data.addColumn(
+'string',
+'Employee'
+);
+
+data.addColumn(
+'string',
+'Manager'
+);
+
+data.addColumn(
+'string',
+'Tooltip'
+);
+
+
+orgData.forEach(emp=>{
+
+data.addRow([
+
+{
+v:emp.name,
+
+f:`
+<div
+style="
+padding:12px;
+width:180px;
+text-align:center;
+line-height:1.5;
+">
+
+<div
+style="
+font-weight:600;
+font-size:14px;
+">
+${emp.name}
+</div>
+
+<div
+style="
+font-size:12px;
+color:#666;
+">
+${emp.designation || ''}
+</div>
+
+</div>
+`
+},
+
+emp.manager || '',
+
+emp.designation || ''
+
+]);
+
+});
+
+
+const chart =
+new google.visualization.OrgChart(
+container
+);
+
+chart.draw(
+
+data,
+
+{
+allowHtml:true,
+allowCollapse:true,
+size:'large'
+}
+
+);
+
+}
+
+  function renderDrillDown(employees) {
+    const filtersContainer = document.getElementById('drill-down-filters');
+    const table = document.getElementById('drill-down-table');
+
+    const departments = ['All', ...new Set(employees.map(e => e['Department']).filter(Boolean))];
+    const managers = ['All', ...new Set(employees.map(e => e['Reporting Manager']).filter(Boolean))];
+    const statuses = ['All', ...new Set(employees.map(e => e['Employment Status']).filter(Boolean))];
+
+    filtersContainer.innerHTML = `
+      <div><label>Region:</label><select id="filter-region" onchange="applyWebAppFilters()"><option>All</option><option>India</option><option>US</option></select></div>
+      <div><label>Department:</label><select id="filter-dept" onchange="applyWebAppFilters()">${departments.map(d => `<option>${d}</option>`).join('')}</select></div>
+      <div><label>Manager:</label><select id="filter-manager" onchange="applyWebAppFilters()">${managers.map(m => `<option>${m}</option>`).join('')}</select></div>
+      <div><label>Status:</label><select id="filter-status" onchange="applyWebAppFilters()">${statuses.map(s => `<option>${s}</option>`).join('')}</select></div>
+    `;
+    
+    applyWebAppFilters();
+  }
+
+  function applyWebAppFilters() {
+    const region = document.getElementById('filter-region').value;
+    const department = document.getElementById('filter-dept').value;
+    const manager = document.getElementById('filter-manager').value;
+    const status = document.getElementById('filter-status').value;
+
+    let employees = [];
+    if (region === 'All') {
+        employees = fullData.allEmployees || [];
+    } else if (region === 'India') {
+        employees = fullData.allEmployees.filter(e => e['Employee ID'].startsWith('IN'));
+    } else {
+        employees = fullData.allEmployees.filter(e => e['Employee ID'].startsWith('US'));
+    }
+
+    const filteredData = employees.filter(emp => {
+        const deptMatch = (department === 'All') || (emp['Department'] === department);
+        const managerMatch = (manager === 'All') || (emp['Reporting Manager'] === manager);
+        const statusMatch = (status === 'All') || (emp['Employment Status'] === status);
+        return deptMatch && managerMatch && statusMatch;
+    });
+
+    const table = document.getElementById('drill-down-table');
+    table.innerHTML = ''; // Clear table
+
+    if (filteredData.length > 0) {
+      const headers = Object.keys(filteredData[0] || {});
+      let headerHtml = '<thead><tr>';
+      headers.forEach(h => headerHtml += `<th>${h}</th>`);
+      headerHtml += '</tr></thead>';
+      
+      let bodyHtml = '<tbody>';
+      filteredData.forEach(emp => {
+        bodyHtml += '<tr>';
+        headers.forEach(h => bodyHtml += `<td>${emp[h] || ''}</td>`);
+        bodyHtml += '</tr>';
+      });
+      bodyHtml += '</tbody>';
+
+      table.innerHTML = headerHtml + bodyHtml;
+    } else {
+      table.innerHTML = '<tbody><tr><td>No employees match the selected criteria.</td></tr></tbody>';
+    }
+  }
+
+  function showError(error) {
+    console.error("Error fetching dashboard data:", error);
+    document.body.innerHTML = `<p style="color: red; padding: 20px;">Error loading dashboard: ${error.message}. Please ensure you are logged into the correct Google account and have access.</p>`;
+  }
+</script>
+  <style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: #f4f7fa;
+    color: #333;
+  }
+  .header {
+    background-color: #ffffff;
+    padding: 20px 40px;
+    border-bottom: 1px solid #ddd;
+  }
+  h1 {
+    color: #1a73e8; /* Google Blue */
+    margin: 0;
+  }
+  h2 {
+    color: #3c4043;
+    border-bottom: 2px solid #e8f0fe;
+    padding-bottom: 8px;
+    margin-top: 0;
+  }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    padding: 20px 40px;
+  }
+  .kpi-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border-left: 5px solid #1a73e8;
+  }
+  .kpi-card .title {
+    font-size: 14px;
+    color: #5f6368;
+  }
+  .kpi-card .value {
+    font-size: 36px;
+    font-weight: 500;
+    color: #202124;
+  }
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 0 40px 40px 40px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .full-width {
+    grid-column: 1 / -1;
+  }
+  .alert-item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+  }
+  .alert-item:last-child {
+    border-bottom: none;
+  }
+   #dept-pie-chart, #attrition-line-chart {
+    width: 100%;
+    min-height: 400px;
+  }
+  #org-chart{
+
+width:100%;
+
+height:900px;
+
+overflow:auto;
+
+padding:20px;
+
+border:1px solid #eee;
+
+}
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  .filter-grid select, .filter-grid input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  #drill-down-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  #drill-down-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #drill-down-table th, #drill-down-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  #drill-down-table th {
+    background-color: #f3f3f3;
+    position: sticky;
+    top: 0;
+  }
+</style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>HR Automation Dashboard</h1>
+      <p>Real-time workforce analytics for Techolution</p>
+    </div>
+
+    <!-- KPI Strip -->
+    <div id="kpi-container" class="kpi-grid"></div>
+
+    <!-- Main Content Grid -->
+    <div class="main-grid">
+      
+      <!-- Alerts Section -->
+      <div class="card" id="alerts-card">
+        <h2>Active Alerts</h2>
+        <div id="lwd-alerts"></div>
+        <div id="probation-alerts"></div>
+      </div>
+
+      <!-- Department Breakdown -->
+      <div class="card">
+        <h2>Department Headcount</h2>
+        <div id="dept-pie-chart"></div>
+      </div>
+
+      <!-- Attrition Trend -->
+      <div class="card">
+        <h2>Quarterly Attrition</h2>
+        <div id="attrition-line-chart"></div>
+      </div>
+
+      <!-- Org Chart -->
+      <div class="card full-width">
+        <h2>Organization Chart</h2>
+        <div id="org-chart"></div>
+      </div>
+
+      <!-- Drill Down -->
+      <div class="card full-width">
+        <h2>Drill-Down Explorer</h2>
+        <div id="drill-down-filters" class="filter-grid"></div>
+        <div id="drill-down-table-container">
+          <table id="drill-down-table"></table>
+        </div>
+      </div>
+
+    </div>
+  </body>
+
+
+
+</html>
