@@ -252,3 +252,205 @@ throw new Error(
 );
 
 }
+
+
+
+function generateEmployeeId(){
+
+const sheet =
+SpreadsheetApp
+.getActiveSpreadsheet()
+.getSheets()[0];
+
+const data =
+sheet
+.getDataRange()
+.getValues();
+
+const headers =
+data[0];
+
+const idCol =
+headers.indexOf(
+"Employee ID"
+);
+
+let max = 999;
+
+for(
+let i=1;
+i<data.length;
+i++
+){
+
+const id =
+String(
+data[i][idCol] || ""
+);
+
+const match =
+id.match(
+/(\d+)/
+);
+
+if(match){
+
+max =
+Math.max(
+max,
+Number(match[1])
+);
+
+}
+
+}
+
+return "IN" + (max+1);
+
+}
+
+
+function addEmployee(employee){
+
+const sheet =
+SpreadsheetApp
+.getActiveSpreadsheet()
+.getSheets()[0];
+
+employee[
+"Employee ID"
+] =
+generateEmployeeId();
+
+const headers =
+sheet
+.getRange(
+1,
+1,
+1,
+sheet.getLastColumn()
+)
+.getValues()[0];
+
+const row =
+headers.map(
+h =>
+employee[h] || ""
+);
+
+sheet.appendRow(
+row
+);
+
+return employee;
+
+}
+
+function deleteEmployee(employeeId){
+
+const sheet =
+SpreadsheetApp
+.getActiveSpreadsheet()
+.getSheets()[0];
+
+
+const data =
+sheet.getDataRange()
+.getValues();
+
+const idCol =
+data[0]
+.indexOf(
+"Employee ID"
+);
+
+for(
+let i=1;
+i<data.length;
+i++
+){
+
+if(
+String(
+data[i][idCol]
+)===String(employeeId)
+){
+
+sheet.deleteRow(i+1);
+
+return true;
+
+}
+
+}
+
+return false;
+
+}
+function sendPerformanceMail(){
+
+const data =
+getProductivityData();
+
+let body =
+
+`
+Productivity Summary
+
+Average Productivity:
+${data.average}%
+
+Top Department:
+${data.topDepartment}
+
+Low Performers:
+${data.lowPerformers}
+
+Department Ranking:
+
+`;
+
+Object
+.entries(
+data.departmentScores || {}
+)
+
+.sort(
+(a,b)=>
+b[1]-a[1]
+)
+
+.forEach(
+([dept,score],i)=>{
+
+body +=
+
+`${i+1}. ${dept} — ${score}%\n`;
+
+});
+
+body +=
+
+`
+
+Generated automatically
+from HR Dashboard.
+
+`;
+
+MailApp.sendEmail({
+
+to:
+'srilakshmimachipeddi@gmail.com',
+
+subject:
+'Productivity Summary',
+
+body:
+body
+
+});
+
+return true;
+
+}

@@ -8,8 +8,41 @@
   let fullData = {};
 
   // Load Google Charts
-  google.charts.load('current', {'packages':['corechart', 'orgchart']});
-  google.charts.setOnLoadCallback(fetchData);
+google.charts.load(
+'current',
+{'packages':['corechart','orgchart']}
+);
+
+google.charts.setOnLoadCallback(
+fetchData
+);
+
+setInterval(()=>{
+
+google.script.run
+
+.withSuccessHandler(
+(data)=>{
+
+fullData = data;
+
+applyWebAppFilters();
+
+renderKpis(
+data.kpis || {}
+);
+
+renderAlerts(
+data.alerts || {},
+data.config || {}
+);
+
+})
+
+.getWebAppDashboardData();
+
+},15000);
+
 
   function fetchData() {
     document.getElementById('kpi-container').innerHTML = 'Loading dashboard data...';
@@ -455,7 +488,7 @@ size:'large'
     }
   }
 
-  function saveRow(
+function saveRow(
 employeeId
 ){
 
@@ -477,16 +510,29 @@ i.value;
 
 });
 
+/* ADD THIS */
+
+updated["Project"] =
+updated["Project"] || "";
+
+updated["Designation"] =
+updated["Designation"] || "";
+
+updated["Resource Allocation"] =
+updated["Resource Allocation"] || "";
+
 google.script.run
 
 .withSuccessHandler(
 ()=>{
 
+fetchData();
+
+/* changed */
+
 alert(
 'Employee updated'
 );
-
-applyWebAppFilters();
 
 })
 
@@ -572,6 +618,17 @@ console.log(
 data
 );
 
+if(
+document
+.getElementById(
+'finance'
+)
+.classList.contains(
+'hidden'
+)
+)
+return;
+
 renderFinance(
 data
 );
@@ -613,73 +670,245 @@ function loadProductivity(){
 google.script.run
 
 .withSuccessHandler(
-renderProductivity
+data=>{
+
+console.log(
+'PRODUCTIVITY DATA',
+data
+);
+
+window.prodData =
+data;
+
+renderProductivity(
+data
+);
+
+}
+)
+
+.withFailureHandler(
+console.error
 )
 
 .getProductivityData();
 
 }
 
-function renderProductivity(data){
+function renderProductivity(
+data
+){
 
-const box =
-document
-.getElementById(
+window.prodData =
+data;
+
+const c =
+
+document.getElementById(
 'productivity-summary'
+);
+
+if(!c)return;
+
+const sorted =
+
+Object
+.entries(
+data.departmentScores || {}
+)
+
+.sort(
+(a,b)=>
+
+b[1]-a[1]
+
 );
 
 let html=`
 
-<div class="kpi-grid">
+<div
+style="
+display:grid;
+grid-template-columns:
+repeat(
+3,
+1fr
+);
+gap:20px;
+margin-bottom:20px;
+"
+>
 
-<div class="kpi-card">
-<h3>Average</h3>
-<p>${data.average}%</p>
+<div class="card">
+
+<h3>
+Average
+</h3>
+
+<p>
+${data.average}%
+</p>
+
 </div>
 
-<div class="kpi-card">
-<h3>Top Dept</h3>
-<p>${data.topDepartment}</p>
+<div class="card">
+
+<h3>
+Top Department
+</h3>
+
+<p>
+${data.topDepartment}
+</p>
+
 </div>
 
-<div class="kpi-card">
-<h3>Low Performers</h3>
-<p>${data.lowPerformers}</p>
+<div class="card">
+
+<h3>
+Low Performers
+</h3>
+
+<p>
+${data.lowPerformers}
+</p>
+
 </div>
 
 </div>
+
+
+<h3>
+
+Department Ranking
+
+</h3>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+"
+>
+
+<tr>
+
+<th>Rank</th>
+
+<th>Department</th>
+
+<th>Score</th>
+
+<th>Trend</th>
+
+</tr>
 
 `;
 
-Object
-.entries(
-data.departmentScores
-)
-.forEach(
-([dept,val])=>{
+sorted.forEach(
+([dept,score],i)=>{
+
+const trend =
+
+score>=98
+
+?
+
+'Improving'
+
+:
+
+score>=90
+
+?
+
+'Stable'
+
+:
+
+'Declining';
 
 html+=`
 
-<div
-class="finance-row"
->
+<tr>
 
-<span>
+<td>
+
+${i+1}
+
+</td>
+
+<td>
+
 ${dept}
-</span>
 
-<span>
-${val}%
-</span>
+</td>
 
-</div>
+<td>
+
+${score}%
+
+</td>
+
+<td>
+
+${trend}
+
+</td>
+
+</tr>
 
 `;
 
 });
 
-box.innerHTML=
+html+=`
+
+</table>
+
+<button
+style="
+margin-top:20px;
+"
+onclick="
+sendPerformanceMail()
+"
+>
+
+Send Summary Email
+
+</button>
+
+`;
+
+c.innerHTML =
 html;
+
+}
+
+function sendPerformanceMail(){
+
+google.script.run
+
+.withSuccessHandler(
+()=>{
+
+alert(
+'Summary email sent'
+);
+
+})
+
+.withFailureHandler(
+err=>{
+
+alert(
+err.message
+);
+
+})
+
+.sendPerformanceMail();
 
 }
 
@@ -738,9 +967,73 @@ ${r.priority.toUpperCase()}
 class="
 recommendation-text
 "
+
+onclick="
+toggleAlertDetails(
+this
+)
+"
+
+style="
+cursor:pointer
+"
+
 >
 
 ${r.text}
+
+${
+r.employees
+
+?
+
+`
+
+<div
+class="alert-details"
+
+style="
+display:none;
+margin-top:10px;
+"
+
+>
+
+${r.employees
+.map(
+e=>
+
+`
+<div>
+
+${e.id}
+
+—
+
+${e.name}
+
+—
+
+${e.days}
+
+days
+
+</div>
+
+`
+)
+
+.join('')}
+
+</div>
+
+`
+
+:
+
+''
+
+}
 
 </div>
 
@@ -752,7 +1045,38 @@ ${r.text}
 
 }
 
+function toggleAlertDetails(
+el
+){
+
+const d =
+
+el.querySelector(
+'.alert-details'
+);
+
+if(
+!d
+)
+return;
+
+d.style.display =
+
+d.style.display==='block'
+
+?
+
+'none'
+
+:
+
+'block';
+
+}
+
 function renderFinance(finance){
+  window.financeData =
+finance;
 
 const container =
 document.getElementById(
@@ -761,61 +1085,237 @@ document.getElementById(
 
 if(!container)return;
 
-const total =
-Object.values(
-finance.regionSummary
+container.innerHTML='';
+
+const totalPayroll =
+
+Object
+.values(
+finance.regionSummary || {}
 )
 .reduce(
 (a,b)=>a+b,
 0
 );
 
-container.innerHTML = `
+let html = `
 
 <div class="finance-grid">
 
 <div class="finance-card">
+
 <h3>Total Payroll</h3>
-₹${total.toLocaleString()}
+
+₹${totalPayroll.toLocaleString()}
+
 </div>
 
 <div class="finance-card">
-<h3>India Payroll</h3>
-₹${(finance.regionSummary.India||0).toLocaleString()}
+
+<h3>India</h3>
+
+₹${(finance.regionSummary?.India||0).toLocaleString()}
+
 </div>
 
 <div class="finance-card">
-<h3>US Payroll</h3>
-₹${(finance.regionSummary.US||0).toLocaleString()}
+
+<h3>US</h3>
+
+₹${(finance.regionSummary?.US||0).toLocaleString()}
+
 </div>
 
 </div>
+
+
+<h3>
+Department Finance
+</h3>
 
 <table class="finance-table">
 
-${Object.entries(
-finance.departmentSummary
+`;
+
+Object.entries(
+finance.departmentSummary||{}
 )
 
-.map(
-([k,v])=>
+.forEach(
+([dept,val])=>{
 
-`
+html+=`
 
-<tr>
-<td>${k}</td>
-<td>₹${v.toLocaleString()}</td>
+<tr
+onclick="
+showFinanceEmployees(
+'${dept}'
+)
+"
+style="
+cursor:pointer;
+"
+>
+
+<td>
+
+${dept}
+
+</td>
+
+<td>
+
+₹${val.toLocaleString()}
+
+</td>
+
 </tr>
 
-`
+`;
 
-)
+});
 
-.join('')}
+html+=`
+
+</table>
+
+<div
+id="finance-drill"
+style="
+margin-top:20px;
+">
+
+</div>
+
+`;
+
+container.innerHTML=
+html;
+
+}
+
+function showFinanceEmployees(
+department
+){
+
+const employees =
+
+financeData
+.employees
+.filter(
+
+e=>
+
+e["Department"]===department
+
+);
+
+let html=`
+
+<h3>
+
+${department}
+
+Employee Details
+
+</h3>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+text-align:left;
+"
+
+>
+
+<thead>
+
+<tr>
+
+<th>Name</th>
+
+<th>ID</th>
+
+<th>Designation</th>
+
+<th>Project</th>
+
+<th>Annual CTC</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+`;
+
+employees.forEach(
+e=>{
+
+html+=`
+
+<tr>
+
+<td>
+
+${e["Employee Name"]||"-"}
+
+</td>
+
+<td>
+
+${e["Employee ID"]||"-"}
+
+</td>
+
+<td>
+
+${e["Designation"]||"-"}
+
+</td>
+
+<td>
+
+${e["Project"]||"Not Assigned"}
+
+</td>
+
+<td>
+
+₹${Number(
+
+e["Annual CTC (INR)"]
+
+||
+
+0
+
+).toLocaleString()}
+
+</td>
+
+</tr>
+
+`;
+
+});
+
+html+=`
+
+</tbody>
 
 </table>
 
 `;
+
+document
+.getElementById(
+'finance-drill'
+)
+.innerHTML=
+html;
 
 }
 
@@ -871,6 +1371,92 @@ active.classList.add(
 }
 
 }
+
+}
+
+
+function openAddEmployee(){
+
+const name =
+prompt(
+"Employee Name"
+);
+
+if(!name)return;
+
+const department =
+prompt(
+"Department"
+);
+
+if(!department)return;
+
+const designation =
+prompt(
+"Designation"
+);
+
+google.script.run
+
+.withSuccessHandler(
+function(emp){
+
+fetchData();
+
+alert(
+"Employee Added\nEmployee ID: "
++
+emp["Employee ID"]
+);
+
+})
+
+.withFailureHandler(
+function(err){
+
+alert(
+err.message
+);
+
+})
+
+.addEmployee({
+
+"Employee Name":name,
+
+"Department":department,
+
+"Designation":designation
+
+});
+
+}
+
+function removeEmployee(){
+
+const id =
+prompt(
+"Employee ID"
+);
+
+if(!id)return;
+
+google.script.run
+
+.withSuccessHandler(
+()=>{
+
+fetchData();
+
+alert(
+"Deleted"
+);
+
+})
+
+.deleteEmployee(
+id
+);
 
 }
 </script>
@@ -1339,6 +1925,18 @@ id="drill-down-filters"
 class="filter-grid">
 </div>
 
+<div style="margin-bottom:16px">
+
+<button onclick="openAddEmployee()">
+Add Employee
+</button>
+
+<button onclick="removeEmployee()">
+Delete Employee
+</button>
+
+</div>
+
 <div
 id="drill-down-table-container">
 
@@ -1370,12 +1968,34 @@ hidden
 
 <h2>Finance</h2>
 
+<div style="
+display:flex;
+justify-content:flex-end;
+margin-bottom:12px;
+">
+
+<button
+class="refresh-btn"
+onclick="loadFinance()">
+
+Refresh Finance
+
+</button>
+
+</div>
+
 <div id="finance-summary">
 
 Loading Finance...
 
 </div>
 
+<div
+id="finance-drill"
+style="
+margin-top:30px;
+">
+</div>
 </div>
 
 </div>
@@ -1395,6 +2015,56 @@ hidden
 <div class="card">
 
 <h2>Productivity</h2>
+
+<div
+style="
+display:flex;
+gap:10px;
+margin-bottom:20px;
+"
+>
+
+<select
+id="prod-dept"
+onchange="loadProductivity()"
+>
+
+<option value="">
+Department
+</option>
+
+</select>
+
+<select
+id="prod-region"
+onchange="loadProductivity()"
+>
+
+<option value="">
+Region
+</option>
+
+</select>
+
+<select
+id="prod-project"
+onchange="loadProductivity()"
+>
+
+<option value="">
+Project
+</option>
+
+</select>
+
+<button
+onclick="loadProductivity()">
+
+Refresh
+
+</button>
+
+</div>
 
 <div id="productivity-summary">
 

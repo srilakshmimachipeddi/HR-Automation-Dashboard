@@ -117,65 +117,203 @@ function getProbationAlerts(config) {
 
   return alerts;
 }
-function getAlertRecommendations() {
 
-  const config = getConfig();
+function getAlertRecommendations(){
 
-  const lwd =
-    getLwdAlerts(config);
+const dashboard = {
 
-  const probation =
-    getProbationAlerts(config);
+allEmployees: [
 
-  const recommendations = [];
+...getData(
+CONFIG.SHEET_NAMES.INDIA_EMPLOYEES
+),
 
-  probation.forEach(emp => {
+...getData(
+CONFIG.SHEET_NAMES.US_EMPLOYEES
+)
 
-    recommendations.push({
-      type:'probation',
-      priority:'medium',
+],
 
-      text:
-`${emp['Employee ID']} probation confirmation due soon — initiate review`
-    });
+quarterlyAttrition:{
+current:0,
+previous:0
+}
 
-  });
+};
 
-  if (lwd.length >= 3) {
+Logger.log(
+dashboard.allEmployees[0]
+);
 
-    recommendations.push({
+const employees =
+dashboard.allEmployees;
 
-      type:'backfill',
+Logger.log(employees[0]);
 
-      priority:'high',
+const recommendations = [];
 
-      text:
-`${lwd.length} interns exiting soon — consider backfill`
+const today =
+new Date();
 
-    });
+let exitingInterns = [];
 
-  }
+employees.forEach(e=>{
 
-  if (
-    recommendations.length === 0
-  ) {
+const empId =
+e["Employee ID"] || "Unknown";
 
-    recommendations.push({
+const status =
+String(
+e["Employment Status"] ||
+e["Employment Type"] ||
+e["Status"] ||
+''
+).toLowerCase();
 
-      type:'healthy',
+Logger.log(
+"STATUS=" + status
+);
 
-      priority:'low',
+Logger.log(
+"LWD=" +
+e["Last Working Day (Interns Only)"]
+);
 
-      text:
-'No active HR actions'
+const probation =
+e["Probation End Date"] ||
+e["Probation Date"];
 
-    });
+if(probation){
 
-  }
+const p =
+new Date(probation);
 
-  return recommendations;
+const days =
+Math.floor(
+(p-today)/86400000
+);
+
+if(days>=0 && days<=5){
+
+recommendations.push({
+priority:'high',
+text:
+`${empId} probation confirmation due in ${days} days`
+});
 
 }
+
+}
+
+const lwd =
+e["Last Working Day (Interns Only)"];
+
+if(
+lwd &&
+status.includes("intern")
+){
+
+const d =
+new Date(
+String(lwd)
+.replace(
+/-/g,
+'/'
+)
+);
+
+const days =
+Math.ceil(
+(
+d.getTime()
+-
+today.getTime()
+)
+/86400000
+);
+
+Logger.log(
+"DATE=" + d
+);
+
+Logger.log(
+"DAYS=" + days
+);
+
+Logger.log(
+"Intern Days="+days
+);
+
+if(
+days>=0 &&
+days<=30
+){
+
+exitingInterns.push({
+
+id:
+empId,
+
+name:
+e["Employee Name"],
+
+days:
+days
+
+});
+
+}
+
+}
+
+});
+
+if(
+exitingInterns.length>=1
+){
+
+recommendations.push({
+
+priority:'medium',
+
+text:
+`${exitingInterns.length} interns exiting within 30 days — consider backfill`,
+
+employees:
+exitingInterns
+
+});
+
+}
+
+if(
+recommendations.length===0
+){
+
+recommendations.push({
+
+priority:'low',
+
+text:
+'No critical HR actions required today'
+
+});
+
+}
+Logger.log(
+employees.filter(
+e =>
+String(
+e["Employment Status"]
+).toLowerCase()
+.includes("intern")
+)
+);
+
+return recommendations;
+
+}
+
 function testRecommendations(){
 
 Logger.log(
