@@ -809,24 +809,15 @@ sorted.forEach(
 ([dept,score],i)=>{
 
 const trend =
-
-score>=98
-
+score>=95
 ?
-
-'Improving'
-
+'↑ Improving'
 :
-
-score>=90
-
+score>=85
 ?
-
-'Stable'
-
+'→ Stable'
 :
-
-'Declining';
+'↓ Declining';
 
 html+=`
 
@@ -838,7 +829,18 @@ ${i+1}
 
 </td>
 
-<td>
+<td
+style="
+cursor:pointer;
+color:#2563eb;
+"
+
+onclick="
+showProductivityDetails(
+'${dept}'
+)
+"
+>
 
 ${dept}
 
@@ -883,6 +885,15 @@ Send Summary Email
 
 c.innerHTML =
 html;
+
+}
+function showProductivityDetails(dept){
+
+alert(
+"Department: " +
+dept +
+"\nPerformance details available"
+);
 
 }
 
@@ -2016,6 +2027,12 @@ hidden
 
 <h2>Productivity</h2>
 
+<p style="color:#666">
+
+Performance trends and department ranking
+
+</p>
+
 <div
 style="
 display:flex;
@@ -2024,45 +2041,23 @@ margin-bottom:20px;
 "
 >
 
-<select
-id="prod-dept"
-onchange="loadProductivity()"
->
 
-<option value="">
-Department
-</option>
 
-</select>
-
-<select
-id="prod-region"
-onchange="loadProductivity()"
->
-
-<option value="">
-Region
-</option>
-
-</select>
-
-<select
-id="prod-project"
-onchange="loadProductivity()"
->
-
-<option value="">
-Project
-</option>
-
-</select>
+<div style="
+display:flex;
+justify-content:flex-end;
+margin-bottom:20px;
+">
 
 <button
+class="refresh-btn"
 onclick="loadProductivity()">
 
-Refresh
+Refresh Productivity
 
 </button>
+
+</div>
 
 </div>
 
