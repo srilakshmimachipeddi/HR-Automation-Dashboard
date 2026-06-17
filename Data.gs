@@ -147,3 +147,108 @@ config[r[0]]=r[1];
 return config;
 
 }
+
+function updateEmployee(
+employeeId,
+updatedData
+){
+
+const sheets = [
+
+CONFIG.SHEET_NAMES
+.INDIA_EMPLOYEES,
+
+CONFIG.SHEET_NAMES
+.US_EMPLOYEES
+
+];
+
+const ss =
+SpreadsheetApp
+.getActive();
+
+for(
+const sheetName
+of sheets
+){
+
+const sheet =
+ss.getSheetByName(
+sheetName
+);
+
+if(
+!sheet
+)
+continue;
+
+const values =
+sheet
+.getDataRange()
+.getValues();
+
+const headers =
+values[0];
+
+const idCol =
+headers.indexOf(
+'Employee ID'
+);
+
+const row =
+values.findIndex(
+(r,i)=>
+
+i>0 &&
+
+r[idCol]
+=== employeeId
+
+);
+
+if(
+row===-1
+)
+continue;
+
+Object.keys(
+updatedData
+).forEach(
+field=>{
+
+const col =
+headers.indexOf(
+field
+);
+
+if(
+col>-1
+){
+
+sheet
+.getRange(
+row+1,
+col+1
+)
+
+.setValue(
+updatedData[
+field
+]
+);
+
+}
+
+});
+
+return {
+success:true
+};
+
+}
+
+throw new Error(
+'Employee not found'
+);
+
+}

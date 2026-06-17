@@ -108,9 +108,7 @@ try {
 
 fullData = data;
 
-renderKpis(
-data.kpis || {}
-);
+renderKpis(data.kpis || {});
 
 renderAlerts(
 data.alerts || {},
@@ -125,8 +123,6 @@ renderAttritionChart(
 data.quarterlyAttrition || {}
 );
 
-/* ADD THIS */
-
 renderOrgChart(
 data.orgChartData || []
 );
@@ -135,11 +131,22 @@ renderDrillDown(
 data.allEmployees || []
 );
 
+loadAlertEngine();
+
+loadFinance();
+
+loadProductivity();
+
+/* ADD THIS LINE */
+showTab('dashboard');
+
 }
 
 catch(err){
 
-console.error(err);
+console.error(
+err
+);
 
 }
 
@@ -390,9 +397,56 @@ size:'large'
       let bodyHtml = '<tbody>';
       filteredData.forEach(emp => {
         bodyHtml += '<tr>';
-        headers.forEach(h => bodyHtml += `<td>${emp[h] || ''}</td>`);
+        headers.forEach(h => {
+        bodyHtml += `<td><input
+        class="edit-cell"
+
+        value="${emp[h] || ''}"
+
+        data-id="${emp['Employee ID']}"
+
+        data-field="${h}"
+
+        style="
+        width:100%;
+        border:none;
+        background:transparent;
+        padding:6px;
+        "
+        />
+
+        </td>
+
+        `;
+
+        });
+
+        bodyHtml += `
+
+        <td>
+
+        <button
+        class="save-btn"
+
+        onclick="
+        saveRow(
+        '${emp['Employee ID']}'
+        )
+        "
+
+        >
+
+        Save
+
+        </button>
+
+        </td>
+
+        `;
+
         bodyHtml += '</tr>';
-      });
+
+        });
       bodyHtml += '</tbody>';
 
       table.innerHTML = headerHtml + bodyHtml;
@@ -401,12 +455,493 @@ size:'large'
     }
   }
 
+  function saveRow(
+employeeId
+){
+
+const inputs =
+
+document.querySelectorAll(
+`input[data-id="${employeeId}"]`
+);
+
+const updated = {};
+
+inputs.forEach(
+i=>{
+
+updated[
+i.dataset.field
+]=
+i.value;
+
+});
+
+google.script.run
+
+.withSuccessHandler(
+()=>{
+
+alert(
+'Employee updated'
+);
+
+applyWebAppFilters();
+
+})
+
+.withFailureHandler(
+err=>{
+
+alert(
+err.message
+);
+
+})
+
+.updateEmployee(
+employeeId,
+updated
+);
+
+}
   function showError(error) {
     console.error("Error fetching dashboard data:", error);
     document.body.innerHTML = `<p style="color: red; padding: 20px;">Error loading dashboard: ${error.message}. Please ensure you are logged into the correct Google account and have access.</p>`;
   }
+
+
+  function loadAlertEngine(){
+
+const container =
+document.getElementById(
+'alert-engine'
+);
+
+container.innerHTML=`
+<div class="loading">
+Loading recommendations...
+</div>
+`;
+
+google.script.run
+
+.withSuccessHandler(
+function(data){
+
+renderAlertEngine(
+data || []
+);
+
+}
+)
+
+.withFailureHandler(
+function(err){
+
+container.innerHTML=
+`
+<div class="empty-state">
+Failed to load recommendations
+</div>
+`;
+
+console.error(
+err
+);
+
+}
+)
+
+.getAlertRecommendations();
+
+}
+function loadFinance(){
+
+console.log(
+'Loading Finance...'
+);
+
+google.script.run
+
+.withSuccessHandler(
+function(data){
+
+console.log(
+'Finance loaded:',
+data
+);
+
+renderFinance(
+data
+);
+
+})
+
+.withFailureHandler(
+function(err){
+
+console.error(
+'Finance error:',
+err
+);
+
+document.getElementById(
+'finance-summary'
+).innerHTML =
+
+`
+<div style="
+color:red;
+padding:20px;
+">
+
+Failed to load Finance
+
+</div>
+`;
+
+})
+
+.getFinanceData();
+
+}
+
+
+function loadProductivity(){
+
+google.script.run
+
+.withSuccessHandler(
+renderProductivity
+)
+
+.getProductivityData();
+
+}
+
+function renderProductivity(data){
+
+const box =
+document
+.getElementById(
+'productivity-summary'
+);
+
+let html=`
+
+<div class="kpi-grid">
+
+<div class="kpi-card">
+<h3>Average</h3>
+<p>${data.average}%</p>
+</div>
+
+<div class="kpi-card">
+<h3>Top Dept</h3>
+<p>${data.topDepartment}</p>
+</div>
+
+<div class="kpi-card">
+<h3>Low Performers</h3>
+<p>${data.lowPerformers}</p>
+</div>
+
+</div>
+
+`;
+
+Object
+.entries(
+data.departmentScores
+)
+.forEach(
+([dept,val])=>{
+
+html+=`
+
+<div
+class="finance-row"
+>
+
+<span>
+${dept}
+</span>
+
+<span>
+${val}%
+</span>
+
+</div>
+
+`;
+
+});
+
+box.innerHTML=
+html;
+
+}
+
+function renderAlertEngine(
+recommendations
+){
+
+const container =
+document.getElementById(
+'alert-engine'
+);
+
+container.innerHTML='';
+
+if(
+!recommendations.length
+){
+
+container.innerHTML=`
+
+<div class="empty-state">
+
+No recommendations
+
+</div>
+
+`;
+
+return;
+
+}
+
+recommendations.forEach(
+r=>{
+
+container.innerHTML += `
+
+<div
+class="
+recommendation-card
+${r.priority}
+"
+>
+
+<div
+class="
+priority
+"
+>
+
+${r.priority.toUpperCase()}
+
+</div>
+
+<div
+class="
+recommendation-text
+"
+>
+
+${r.text}
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+
+function renderFinance(finance){
+
+const container =
+document.getElementById(
+'finance-summary'
+);
+
+if(!container)return;
+
+const total =
+Object.values(
+finance.regionSummary
+)
+.reduce(
+(a,b)=>a+b,
+0
+);
+
+container.innerHTML = `
+
+<div class="finance-grid">
+
+<div class="finance-card">
+<h3>Total Payroll</h3>
+₹${total.toLocaleString()}
+</div>
+
+<div class="finance-card">
+<h3>India Payroll</h3>
+₹${(finance.regionSummary.India||0).toLocaleString()}
+</div>
+
+<div class="finance-card">
+<h3>US Payroll</h3>
+₹${(finance.regionSummary.US||0).toLocaleString()}
+</div>
+
+</div>
+
+<table class="finance-table">
+
+${Object.entries(
+finance.departmentSummary
+)
+
+.map(
+([k,v])=>
+
+`
+
+<tr>
+<td>${k}</td>
+<td>₹${v.toLocaleString()}</td>
+</tr>
+
+`
+
+)
+
+.join('')}
+
+</table>
+
+`;
+
+}
+
+function showTab(tab, button = null){
+
+document
+.querySelectorAll('.page-section')
+.forEach(
+page =>
+page.classList.add('hidden')
+);
+
+const selected =
+document.getElementById(tab);
+
+if(selected){
+
+selected.classList.remove(
+'hidden'
+);
+
+}
+
+document
+.querySelectorAll('.nav-btn')
+.forEach(
+btn =>
+btn.classList.remove(
+'active'
+)
+);
+
+if(button){
+
+button.classList.add(
+'active'
+);
+
+}
+else{
+
+const active =
+document.querySelector(
+`[data-page="${tab}"]`
+);
+
+if(active){
+
+active.classList.add(
+'active'
+);
+
+}
+
+}
+
+}
 </script>
   <style>
+    .top-nav{
+
+display:flex;
+
+gap:12px;
+
+padding:16px;
+
+border-bottom:1px solid #ddd;
+
+background:white;
+
+position:sticky;
+
+top:0;
+
+z-index:100;
+
+}
+
+.top-nav button{
+
+padding:10px 18px;
+
+border:none;
+
+background:#f5f5f5;
+
+cursor:pointer;
+
+border-radius:6px;
+
+}
+
+.top-nav button:hover{
+
+background:#e7ecff;
+
+}
+
+.hidden{
+
+display:none;
+
+}
+
+.metric-card{
+
+cursor:pointer;
+
+transition:.2s;
+
+}
+
+.metric-card:hover{
+
+transform:translateY(-2px);
+
+}
+
+.loading{
+
+color:#777;
+
+font-style:italic;
+
+}
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     margin: 0;
@@ -520,56 +1055,394 @@ border:1px solid #eee;
     position: sticky;
     top: 0;
   }
+
+
+ .alert-engine-grid{
+
+display:grid;
+
+gap:16px;
+
+margin-top:20px;
+
+}
+
+.recommendation-card{
+
+padding:18px;
+
+border-radius:10px;
+
+border:1px solid #ddd;
+
+background:#fff;
+
+transition:.2s;
+
+}
+
+.recommendation-card:hover{
+
+transform:
+translateY(-2px);
+
+}
+
+.priority{
+
+font-size:12px;
+
+font-weight:700;
+
+margin-bottom:8px;
+
+}
+
+.recommendation-card.high{
+
+border-left:
+6px solid #d93025;
+
+}
+
+.recommendation-card.medium{
+
+border-left:
+6px solid #f9ab00;
+
+}
+
+.recommendation-card.low{
+
+border-left:
+6px solid #188038;
+
+}
+
+.refresh-btn{
+
+margin-top:16px;
+
+padding:10px 16px;
+
+border:none;
+
+background:#1a73e8;
+
+color:white;
+
+border-radius:8px;
+
+cursor:pointer;
+
+}
+
+.empty-state{
+
+padding:24px;
+
+text-align:center;
+
+color:#777;
+
+}
+.edit-cell:focus{
+
+outline:none;
+
+background:#f8fafc;
+
+}
+
+.save-btn{
+
+padding:6px 12px;
+
+background:#2563eb;
+
+color:white;
+
+border:none;
+
+border-radius:6px;
+
+cursor:pointer;
+
+}
+
+.save-btn:hover{
+
+opacity:.9;
+
+}
+.finance-grid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:16px;
+margin-bottom:20px;
+}
+
+.finance-card{
+padding:18px;
+background:white;
+border-radius:12px;
+}
+
+.finance-table{
+width:100%;
+border-collapse:collapse;
+}
+
+.finance-table td{
+padding:10px;
+border-bottom:1px solid #eee;
+}
+.nav-btn{
+
+padding:12px 20px;
+
+background:#f6f8fb;
+
+border:1px solid #ddd;
+
+border-radius:8px;
+
+}
+
+.nav-btn.active{
+
+background:#2563eb;
+
+color:white;
+
+border-color:#2563eb;
+
+}
+
+.nav-btn:hover{
+
+background:#eef3ff;
+
+}
+
+.hidden{
+
+display:none;
+}
+
 </style>
   </head>
+
   <body>
-    <div class="header">
-      <h1>HR Automation Dashboard</h1>
-      <p>Real-time workforce analytics for Techolution</p>
-    </div>
 
-    <!-- KPI Strip -->
-    <div id="kpi-container" class="kpi-grid"></div>
+<div class="top-nav">
 
-    <!-- Main Content Grid -->
-    <div class="main-grid">
-      
-      <!-- Alerts Section -->
-      <div class="card" id="alerts-card">
-        <h2>Active Alerts</h2>
-        <div id="lwd-alerts"></div>
-        <div id="probation-alerts"></div>
-      </div>
+<button class="nav-btn active"
+data-page="dashboard"
+onclick="showTab('dashboard',this)">
+Dashboard
+</button>
 
-      <!-- Department Breakdown -->
-      <div class="card">
-        <h2>Department Headcount</h2>
-        <div id="dept-pie-chart"></div>
-      </div>
+<button class="nav-btn"
+data-page="finance"
+onclick="showTab('finance',this)">
+Finance
+</button>
 
-      <!-- Attrition Trend -->
-      <div class="card">
-        <h2>Quarterly Attrition</h2>
-        <div id="attrition-line-chart"></div>
-      </div>
+<button class="nav-btn"
+data-page="productivity"
+onclick="showTab('productivity',this)">
+Productivity
+</button>
 
-      <!-- Org Chart -->
-      <div class="card full-width">
-        <h2>Organization Chart</h2>
-        <div id="org-chart"></div>
-      </div>
+<button class="nav-btn"
+data-page="alerts"
+onclick="showTab('alerts',this)">
+Alert Engine
+</button>
 
-      <!-- Drill Down -->
-      <div class="card full-width">
-        <h2>Drill-Down Explorer</h2>
-        <div id="drill-down-filters" class="filter-grid"></div>
-        <div id="drill-down-table-container">
-          <table id="drill-down-table"></table>
-        </div>
-      </div>
+</div>
 
-    </div>
-  </body>
+
+<div class="header">
+
+<h1>
+HR Automation Dashboard
+</h1>
+
+<p>
+Real-time workforce analytics
+</p>
+
+</div>
+
+
+
+<!-- DASHBOARD -->
+
+<div
+id="dashboard"
+class="page-section"
+>
+
+<div
+id="kpi-container"
+class="kpi-grid">
+</div>
+
+<div class="main-grid">
+
+<div class="card">
+
+<h2>Active Alerts</h2>
+
+<div id="lwd-alerts"></div>
+
+<div id="probation-alerts"></div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Department Headcount</h2>
+
+<div id="dept-pie-chart"></div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Quarterly Attrition</h2>
+
+<div id="attrition-line-chart"></div>
+
+</div>
+
+
+<div class="card full-width">
+
+<h2>Organization Chart</h2>
+
+<div id="org-chart"></div>
+
+</div>
+
+
+<div class="card full-width">
+
+<h2>Drill Down Explorer</h2>
+
+<div
+id="drill-down-filters"
+class="filter-grid">
+</div>
+
+<div
+id="drill-down-table-container">
+
+<table
+id="drill-down-table">
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- FINANCE -->
+
+<div
+id="finance"
+class="
+page-section
+hidden
+"
+>
+
+<div class="card">
+
+<h2>Finance</h2>
+
+<div id="finance-summary">
+
+Loading Finance...
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- PRODUCTIVITY -->
+
+<div
+id="productivity"
+class="
+page-section
+hidden
+"
+>
+
+<div class="card">
+
+<h2>Productivity</h2>
+
+<div id="productivity-summary">
+
+Loading Productivity...
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- ALERT ENGINE -->
+
+<div
+id="alerts"
+class="
+page-section
+hidden
+"
+>
+
+<div class="card">
+
+<h2>Alert Engine</h2>
+
+<div
+id="alert-engine"
+class="alert-engine-grid">
+
+Loading...
+
+</div>
+
+<button
+class="refresh-btn"
+onclick="loadAlertEngine()">
+
+Refresh Recommendations
+
+</button>
+
+</div>
+
+</div>
+
+</body>
 
 
 

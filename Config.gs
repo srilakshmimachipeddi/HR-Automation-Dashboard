@@ -8,7 +8,9 @@ const CONFIG = {
     INDIA_EMPLOYEES: 'India Employee Database',
     US_EMPLOYEES: 'US Employee Database',
     RM_DATA: 'RM Data',
-    FINANCE: 'Finance · Productivity',
+
+    FINANCE: 'Finance',
+
     RISK: 'Risk Report',
     OFFBOARDED: 'Offboarded Resources',
     DASHBOARD: 'Dashboard',
@@ -17,11 +19,19 @@ const CONFIG = {
     CONFIG: '_Config',
     LOGS: 'Logs'
   },
+
   ALERTS: {
     LWD_DAYS: 45,
     PROBATION_DAYS: 180,
     PROBATION_NOTICE_DAYS: 30,
-    EMAIL_RECIPIENTS: 'hr@techolution.com'
-  },
-  // Add other configuration values here
+    EMAIL_RECIPIENTS:
+      'srilakshmimachipeddi@gmail.com'
+  }
 };
+function testConfig() {
+  const config = getConfig();
+
+  Logger.log(
+    config.EMAIL_RECIPIENTS
+  );
+}

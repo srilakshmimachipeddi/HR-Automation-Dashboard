@@ -24,16 +24,43 @@ function checkAlerts() {
   }
   
   if (emailBody) {
-    MailApp.sendEmail({
-      to: config.EMAIL_RECIPIENTS,
-      subject: 'HR Dashboard: Daily Alerts',
-      htmlBody: emailBody
-    });
-    log('Alerts email sent.');
-  } else {
-    log('No active alerts.');
-  }
+
+  const recipient =
+  CONFIG.ALERTS.EMAIL_RECIPIENTS;
+
+  MailApp.sendEmail({
+    to: recipient,
+    subject:
+      `HR Dashboard: Alert Engine Report`,
+    htmlBody: emailBody
+  });
+
+  log(
+    'Alerts email sent',
+    'INFO',
+    JSON.stringify({
+      recipient,
+      lwdAlerts:
+        lwdAlerts.length,
+      probationAlerts:
+        probationAlerts.length
+    })
+  );
+
+} else {
+
+  log(
+    'No active alerts',
+    'INFO',
+    JSON.stringify({
+      lwdAlerts:0,
+      probationAlerts:0
+    })
+  );
+
 }
+}
+
 
 function getLwdAlerts(config) {
   const allEmployees = getIndiaEmployees().concat(getUsEmployees());
@@ -89,4 +116,72 @@ function getProbationAlerts(config) {
   });
 
   return alerts;
+}
+function getAlertRecommendations() {
+
+  const config = getConfig();
+
+  const lwd =
+    getLwdAlerts(config);
+
+  const probation =
+    getProbationAlerts(config);
+
+  const recommendations = [];
+
+  probation.forEach(emp => {
+
+    recommendations.push({
+      type:'probation',
+      priority:'medium',
+
+      text:
+`${emp['Employee ID']} probation confirmation due soon — initiate review`
+    });
+
+  });
+
+  if (lwd.length >= 3) {
+
+    recommendations.push({
+
+      type:'backfill',
+
+      priority:'high',
+
+      text:
+`${lwd.length} interns exiting soon — consider backfill`
+
+    });
+
+  }
+
+  if (
+    recommendations.length === 0
+  ) {
+
+    recommendations.push({
+
+      type:'healthy',
+
+      priority:'low',
+
+      text:
+'No active HR actions'
+
+    });
+
+  }
+
+  return recommendations;
+
+}
+function testRecommendations(){
+
+Logger.log(
+JSON.stringify(
+getAlertRecommendations()
+)
+);
+
 }
